@@ -2,6 +2,8 @@ package service
 
 import (
 	"Service/model/response"
+	"bytes"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,24 +31,7 @@ func (s *FileTreeService) GetFileTree(rootPath string, ignoreDirs, ignoreFiles, 
 		return nil, os.ErrNotExist
 	}
 
-	filter := &IgnoreFilter{
-		Dirs:  make(map[string]bool),
-		Files: make(map[string]bool),
-		Exts:  make(map[string]bool),
-	}
-	for _, d := range ignoreDirs {
-		filter.Dirs[d] = true
-	}
-	for _, f := range ignoreFiles {
-		filter.Files[f] = true
-	}
-	for _, e := range ignoreExts {
-		ext := e
-		if !strings.HasPrefix(ext, ".") {
-			ext = "." + ext
-		}
-		filter.Exts[strings.ToLower(ext)] = true
-	}
+	filter := s.newIgnoreFilter(ignoreDirs, ignoreFiles, ignoreExts)
 
 	var result []*response.FileNode
 	entries, err := os.ReadDir(absRoot)
@@ -65,6 +50,95 @@ func (s *FileTreeService) GetFileTree(rootPath string, ignoreDirs, ignoreFiles, 
 	}
 
 	return result, nil
+}
+
+func (s *FileTreeService) GetFileContent(rootPath string, ignoreDirs, ignoreFiles, ignoreExts, selectedPaths []string) (string, error) {
+	absRoot, err := filepath.Abs(rootPath)
+	if err != nil {
+		return "", err
+	}
+
+	info, err := os.Stat(absRoot)
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		return "", os.ErrNotExist
+	}
+
+	filter := s.newIgnoreFilter(ignoreDirs, ignoreFiles, ignoreExts)
+	selected := make(map[string]bool)
+	for _, path := range selectedPaths {
+		selected[filepath.ToSlash(filepath.Clean(path))] = true
+	}
+
+	var builder strings.Builder
+	err = filepath.WalkDir(absRoot, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == absRoot {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(absRoot, path)
+		if err != nil {
+			return err
+		}
+		outputPath := relPath
+		selectedPath := filepath.ToSlash(relPath)
+
+		builder.WriteString(outputPath)
+		builder.WriteString("\n")
+
+		if s.shouldIgnore(entry.Name(), entry.IsDir(), filter) {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if entry.IsDir() || !selected[selectedPath] {
+			return nil
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		builder.Write(content)
+		if !bytes.HasSuffix(content, []byte("\n")) {
+			builder.WriteString("\n")
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return builder.String(), nil
+}
+
+func (s *FileTreeService) newIgnoreFilter(ignoreDirs, ignoreFiles, ignoreExts []string) *IgnoreFilter {
+	filter := &IgnoreFilter{
+		Dirs:  make(map[string]bool),
+		Files: make(map[string]bool),
+		Exts:  make(map[string]bool),
+	}
+	for _, d := range ignoreDirs {
+		filter.Dirs[d] = true
+	}
+	for _, f := range ignoreFiles {
+		filter.Files[f] = true
+	}
+	for _, e := range ignoreExts {
+		ext := e
+		if !strings.HasPrefix(ext, ".") {
+			ext = "." + ext
+		}
+		filter.Exts[strings.ToLower(ext)] = true
+	}
+	return filter
 }
 
 func (s *FileTreeService) shouldIgnore(name string, isDir bool, filter *IgnoreFilter) bool {

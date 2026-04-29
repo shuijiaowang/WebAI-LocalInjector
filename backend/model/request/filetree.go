@@ -6,3 +6,8 @@ type FileTreeRequest struct {
 	IgnoreFiles []string `json:"ignoreFiles"`
 	IgnoreExts  []string `json:"ignoreExts"`
 }
+
+type FileContentRequest struct {
+	FileTreeRequest
+	SelectedPaths []string `json:"selectedPaths"`
+}

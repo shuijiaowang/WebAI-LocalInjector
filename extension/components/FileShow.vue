@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { usePost } from "@/core/request.js";
 import { useAppStore } from "@/pinia/app.js";
+import GetFileContent from "@/components/GetFileContent.vue";
 
 const appStore = useAppStore()
 
@@ -135,6 +136,7 @@ const handleUpdate = async () => {
       <button type="button" :disabled="loading" @click="handleUpdate">
         {{ loading ? "更新中..." : "更新" }}
       </button>
+
       <span v-if="error" class="error">请求失败：{{ error }}</span>
     </div>
 

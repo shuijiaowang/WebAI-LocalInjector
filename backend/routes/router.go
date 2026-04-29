@@ -23,6 +23,7 @@ func SetupRouter() *gin.Engine {
 	fileGroup := apiGroup.Group("/file")
 	{
 		fileGroup.POST("/tree", fileTreeApi.GetFileTree)
+		fileGroup.POST("/content", fileTreeApi.GetFileContent)
 	}
 	return r
 }

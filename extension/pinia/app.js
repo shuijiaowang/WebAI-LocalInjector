@@ -44,6 +44,18 @@ export const useAppStore = defineStore('app', () => {
             ignoreExts: normalizeIgnoreItems(request.ignoreExts ?? fallback.ignoreExts),
         }
     }
+
+    const createAskToAIFallback = () => ({
+        globalPrompt: '',
+        currentQuestion: '',
+        questionHistory: [],
+    })
+
+    const normalizeAskToAI = (askToAI = {}) => ({
+        globalPrompt: askToAI.globalPrompt ?? '',
+        currentQuestion: askToAI.currentQuestion ?? '',
+        questionHistory: Array.isArray(askToAI.questionHistory) ? askToAI.questionHistory.slice(0, 3) : [],
+    })
     //用于提取fileTreeRequest中选中true的项作为请求参数请求后端
     const getSelectedIgnoreConfig = () => {
         // 解构当前文件树配置
@@ -69,6 +81,7 @@ export const useAppStore = defineStore('app', () => {
     const appState =reactive({
         fileTreeRequest: createFileTreeRequestFallback(),
         fileSelected: [],
+        askToAI: createAskToAIFallback(),
     })
     const initAppState=async ()=>{
         appState.fileTreeRequestStorage=storage.defineItem(`local:fileTreeRequest`, {
@@ -86,6 +99,14 @@ export const useAppStore = defineStore('app', () => {
         appState.fileSelected=Array.isArray(storedFileSelected) ? storedFileSelected : []
         appState.saveFileSelected=async (fileSelected = appState.fileSelected) => {
             await appState.fileSelectedStorage.setValue(toPlain(fileSelected))
+        }
+
+        appState.askToAIStorage=storage.defineItem(`local:askToAI`, {
+            fallback: createAskToAIFallback()
+        })
+        appState.askToAI=normalizeAskToAI(await appState.askToAIStorage.getValue())
+        appState.saveAskToAI=async (askToAI = appState.askToAI) => {
+            await appState.askToAIStorage.setValue(toPlain(askToAI))
         }
     }
     initAppState()

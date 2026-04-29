@@ -27,3 +27,19 @@ func (h *FileTreeApi) GetFileTree(c *gin.Context) {
 
 	response.Result(0, tree, "成功", c)
 }
+
+func (h *FileTreeApi) GetFileContent(c *gin.Context) {
+	var req request.FileContentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Result(400, nil, "参数错误: "+err.Error(), c)
+		return
+	}
+
+	content, err := fileTreeService.GetFileContent(req.RootPath, req.IgnoreDirs, req.IgnoreFiles, req.IgnoreExts, req.SelectedPaths)
+	if err != nil {
+		response.Result(500, nil, "读取文件内容失败: "+err.Error(), c)
+		return
+	}
+
+	response.Result(0, content, "成功", c)
+}

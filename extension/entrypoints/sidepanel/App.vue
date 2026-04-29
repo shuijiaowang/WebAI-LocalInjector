@@ -3,6 +3,7 @@ import { ref } from "vue";
 import {usePost} from "@/core/request.js";
 import FileRequest from "@/components/FileRequest.vue";
 import FileShow from "@/components/FileShow.vue";
+import AskToAI from "@/components/AskToAI.vue";
 
 const result = ref("");
 const loading = ref(false);
@@ -30,6 +31,7 @@ async function handleToContent() {
 </script>
 
 <template>
+  <AskToAI></AskToAI>
   <FileRequest></FileRequest>
   <FileShow></FileShow>
   <p>sssssssss</p>
