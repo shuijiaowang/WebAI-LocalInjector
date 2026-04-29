@@ -1,6 +1,5 @@
 
 import {defineContentScript} from "#imports";
-import {init} from "../../core/init.js";
 
 // 定义内容脚本：仅注入到B站视频播放页
 export default defineContentScript({

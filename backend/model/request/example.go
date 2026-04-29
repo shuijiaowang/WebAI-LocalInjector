@@ -1,5 +1,5 @@
 package request
 
 type ExampleRequest struct {
-	//example string `json:"example" form:"example"`
+	Example string `json:"example" form:"example"`
 }

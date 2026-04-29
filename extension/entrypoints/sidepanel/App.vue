@@ -1,6 +1,8 @@
 <script setup>
-import HelloWorld from "@/components/HelloWorld.vue";
 import { ref } from "vue";
+import {usePost} from "@/core/request.js";
+import FileRequest from "@/components/FileRequest.vue";
+import FileShow from "@/components/FileShow.vue";
 
 const result = ref("");
 const loading = ref(false);
@@ -8,24 +10,18 @@ const error = ref("");
 
 async function handleRequest() {
   loading.value = true;
-  error.value = "";
-  result.value = "";
-
-  try {
-    const res = await fetch("http://localhost:9009/api/example/test", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    const data = await res.json();
-    result.value = JSON.stringify(data, null, 2);
-  } catch (e) {
-    error.value = e.message;
-  } finally {
-    loading.value = false;
+  // 只需要传接口后半段即可！
+  const res = await usePost("/example/test", {
+    example:"测试请求"
+  });
+  if (res.data) {
+    result.value=res.data
   }
+  if (res.error) {
+    error.value = res.error;
+  }
+  loading.value = false;
 }
-
 async function handleToContent() {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
   await browser.tabs.sendMessage(tab.id, {type: "form_sidepanel"});
@@ -34,9 +30,9 @@ async function handleToContent() {
 </script>
 
 <template>
+  <FileRequest></FileRequest>
+  <FileShow></FileShow>
   <p>sssssssss</p>
-  <HelloWorld></HelloWorld>
-
   <div style="margin-top: 16px;">
     <button @click="handleRequest" :disabled="loading">
       {{ loading ? "请求中..." : "发送 POST 请求" }}
