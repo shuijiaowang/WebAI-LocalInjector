@@ -68,7 +68,7 @@ export const useAppStore = defineStore('app', () => {
     //全局状态
     const appState =reactive({
         fileTreeRequest: createFileTreeRequestFallback(),
-        fileSelected: {},
+        fileSelected: [],
     })
     const initAppState=async ()=>{
         appState.fileTreeRequestStorage=storage.defineItem(`local:fileTreeRequest`, {
@@ -80,10 +80,13 @@ export const useAppStore = defineStore('app', () => {
         appState.fileTreeRequest=normalizeFileTreeRequest(await appState.fileTreeRequestStorage.getValue())
 
         appState.fileSelectedStorage=storage.defineItem(`local:fileSelected`, {
-            fallback: {}
+            fallback: []
         })
-        appState.fileSelected=appState.fileSelectedStorage.getValue()
-        appState.saveFileSelected=appState.fileSelectedStorage.setValue(toPlain(appState.fileSelectedStorage))
+        const storedFileSelected=await appState.fileSelectedStorage.getValue()
+        appState.fileSelected=Array.isArray(storedFileSelected) ? storedFileSelected : []
+        appState.saveFileSelected=async (fileSelected = appState.fileSelected) => {
+            await appState.fileSelectedStorage.setValue(toPlain(fileSelected))
+        }
     }
     initAppState()
     // 统一导出

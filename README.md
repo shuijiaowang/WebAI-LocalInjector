@@ -107,3 +107,72 @@ appState.fileTreeRequestStorage=storage.defineItem(`local:fileTreeRequest`, {
 【已知信息】报错/现象/复现步骤/已有能力（最多5行，极简表述）
 【验收标准】可量化、可验证的成功条件（拒绝“能用就行”）
 【输出要求】先给核心结论，再给修改点；代码改动尽量小
+
+
+
+【任务类型】新增前端vue组件和storage存储
+【核心目标/问题】
+现在需要新建一个vue组件，extension/components/FileShow.vue
+用于向后端发送请求，并渲染请求返回的目录结构。
+
+1.新增一个“更新”按钮，点击会调用extension/core/request.js中的方法请求后端。
+请求参数来自extension/pinia/app.js中的getSelectedIgnoreConfig//这部分已经提前写好，应该是正确的
+http://127.0.0.1:9009/api/file/tree
+{
+"rootPath": "D:\\project\\test\\WebAI-LocalInjector",
+"ignoreDirs": [".idea", "node_modules", ".git", ".wxt","extension"],
+"ignoreFiles": ["go.sum", "package-lock.json"],
+"ignoreExts": [".png", ".svg", ".ico"]
+}
+2.将返回的结构格式化处理，给每个项添加一个false选项？返回的数据存到appState.fileSelected
+3.FileShow.vue中添加目录结构展示，
+首先是目录结构，然后文件夹/文件的前面添加复选框，点击会设置为true。这里怎么考究呢？文件夹选择表示全选？不太清楚。
+4.后端返回的结构大抵如下：
+```
+{
+  "code": 0,
+  "data": [
+    {
+      "name": "request",
+      "path": "request",
+      "isDir": true,
+      "children": [
+        {
+          "name": "example.go",
+          "path": "request/example.go",
+          "isDir": false
+        },
+        {
+          "name": "filetree.go",
+          "path": "request/filetree.go",
+          "isDir": false
+        }
+      ]
+    },
+    {
+      "name": "response",
+      "path": "response",
+      "isDir": true,
+      "children": [
+        {
+          "name": "filetree.go",
+          "path": "response/filetree.go",
+          "isDir": false
+        }
+      ]
+    }
+  ],
+  "msg": "成功"
+}
+```
+5.后端service文件路径：backend/service/filetree.go，//如果后端不正确不合适可以轻量修改。
+6.需要考虑第二次的请求不是全量覆盖第一次请求,而是对比增删。
+如第一次请求返回a.txt,b.txt
+appState.fileSelected会存储类似于：，a.txt/false,b.txt/false-->勾选b.txt-->a.txt/false,b.txt/true
+第二次请求更新时，返回时目录发生了变化，b.txt，c.txt-->a.txt(不存在了清除),b.txt/true(保留上次的勾选状态),c.txt/false(新增，默认fasle)
+【明确前提&假设】列清前置判断，不确定项直接提问
+【只允许查看】允许查看前后端相关代码文件。
+【不要做】不要全项目扫描；不要改无关代码；不要跑全量构建，不要自动执行全量测试；不要循环修复；不要测试我会手动测试的。
+【已知信息】报错/现象/复现步骤/已有能力（最多5行，极简表述）
+【验收标准】可量化、可验证的成功条件（拒绝“能用就行”）
+【输出要求】先给核心结论，再给修改点；代码改动尽量小
