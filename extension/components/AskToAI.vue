@@ -8,6 +8,8 @@ const appStore = useAppStore()
 const contentLoading = ref(false)
 const error = ref("")
 const copyStatus = ref("")
+const insertStatus = ref("")
+const insertError = ref("")
 const fullPrompt = ref("")
 
 const fileTree = computed(() => {
@@ -99,10 +101,29 @@ const copyFullPrompt = async () => {
   }
 }
 
+const handleToContent = async (content) => {
+  insertStatus.value = ""
+  insertError.value = ""
+
+  try {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
+    if (!tab?.id) {
+      throw new Error("未找到当前标签页")
+    }
+    await browser.tabs.sendMessage(tab.id, { type: "form_sidepanel", content })
+    insertStatus.value = "已发送到页面"
+    console.log("成功发送消息给页面脚本")
+  } catch (e) {
+    insertError.value = e.message
+  }
+}
+
 const handlePrintContent = async () => {
   contentLoading.value = true
   error.value = ""
   copyStatus.value = ""
+  insertStatus.value = ""
+  insertError.value = ""
 
   const { data, error: requestError } = await usePost(
     "/file/content",
@@ -128,34 +149,25 @@ const handlePrintContent = async () => {
 
     fullPrompt.value = buildFullPrompt(result.data)
     await recordQuestionHistory()
+    await handleToContent(fullPrompt.value)
   } catch (e) {
     error.value = e.message
   }
 }
 
 watch(
-  () => appStore.appState.askToAI,
-  async (value) => {
-    if (!value || !appStore.appState.saveAskToAI) {
+  () => askToAI.value.currentQuestion,
+  async () => {
+    if (!askToAI.value || !appStore.appState.saveAskToAI) {
       return
     }
-    await appStore.appState.saveAskToAI(value)
+    await appStore.appState.saveAskToAI(askToAI.value)
   },
-  { deep: true },
 )
 </script>
 
 <template>
   <section class="ask-to-ai">
-    <label class="field">
-      <span>全局提示词</span>
-      <textarea
-        v-model="askToAI.globalPrompt"
-        rows="4"
-        placeholder="例如：代码风格、项目文档、输出要求"
-      />
-    </label>
-
     <label class="field">
       <span>本次提问需求</span>
       <textarea
@@ -182,18 +194,24 @@ watch(
       <button type="button" :disabled="contentLoading" @click="handlePrintContent">
         {{ contentLoading ? "输出中..." : "输出内容" }}
       </button>
+      <span v-if="insertStatus" class="copy-status">{{ insertStatus }}</span>
+      <span v-if="insertError" class="warn">页面插入失败：{{ insertError }}</span>
       <span v-if="error" class="error">请求失败：{{ error }}</span>
     </div>
 
-    <label class="field">
-      <span>完整提问文本</span>
-      <textarea v-model="fullPrompt" rows="5" readonly placeholder="点击输出内容后生成完整提问文本" />
-    </label>
-
-    <div class="toolbar">
+    <div class="prompt-result">
+      <div class="prompt-meta">
+        <strong>完整提问文本</strong>
+        <span>{{ fullPrompt ? `已生成 ${fullPrompt.length} 字` : "点击输出内容后生成" }}</span>
+      </div>
       <button type="button" :disabled="!fullPrompt" @click="copyFullPrompt">复制完整提问</button>
       <span v-if="copyStatus" class="copy-status">{{ copyStatus }}</span>
     </div>
+
+    <details v-if="fullPrompt" class="prompt-preview">
+      <summary>查看完整提问文本</summary>
+      <textarea v-model="fullPrompt" rows="5" readonly />
+    </details>
   </section>
 </template>
 
@@ -236,12 +254,52 @@ textarea {
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
 
+.prompt-result {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.prompt-meta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.prompt-meta span {
+  overflow: hidden;
+  color: #666;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prompt-preview {
+  color: #444;
+}
+
+.prompt-preview summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
 .error {
   color: #d93025;
+}
+
+.warn {
+  color: #b06000;
 }
 
 .copy-status {

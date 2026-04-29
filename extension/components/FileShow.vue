@@ -2,12 +2,12 @@
 import { computed, ref } from "vue";
 import { usePost } from "@/core/request.js";
 import { useAppStore } from "@/pinia/app.js";
-import GetFileContent from "@/components/GetFileContent.vue";
 
 const appStore = useAppStore()
 
 const loading = ref(false)
 const error = ref("")
+const expandedPaths = ref(new Set())
 
 const vIndeterminate = (el, binding) => {
   el.indeterminate = binding.value
@@ -23,7 +23,7 @@ const visibleRows = computed(() => {
   const walk = (nodes = [], depth = 0) => {
     nodes.forEach((node) => {
       rows.push({ node, depth })
-      if (node.isDir && node.children?.length) {
+      if (node.isDir && node.children?.length && expandedPaths.value.has(node.path)) {
         walk(node.children, depth + 1)
       }
     })
@@ -78,6 +78,18 @@ const isIndeterminate = (node) => {
   return !node.selected && hasSelectedChildren(node)
 }
 
+const isExpanded = (node) => expandedPaths.value.has(node.path)
+
+const handleExpand = (node) => {
+  const nextPaths = new Set(expandedPaths.value)
+  if (nextPaths.has(node.path)) {
+    nextPaths.delete(node.path)
+  } else {
+    nextPaths.add(node.path)
+  }
+  expandedPaths.value = nextPaths
+}
+
 const saveFileSelected = async () => {
   if (appStore.appState.saveFileSelected) {
     await appStore.appState.saveFileSelected(fileTree.value)
@@ -123,6 +135,7 @@ const handleUpdate = async () => {
     const selectedMap = createSelectionMap(fileTree.value)
     appStore.appState.fileSelected = mergeFileTree(result.data, selectedMap)
     syncDirSelected(appStore.appState.fileSelected)
+    expandedPaths.value = new Set(appStore.appState.fileSelected.map((node) => node.path))
     await saveFileSelected()
   } catch (e) {
     error.value = e.message
@@ -133,8 +146,12 @@ const handleUpdate = async () => {
 <template>
   <section class="file-show">
     <div class="toolbar">
+      <div>
+        <h2>目录更新与勾选</h2>
+        <p>选择要合并到本次提问里的文件或目录。</p>
+      </div>
       <button type="button" :disabled="loading" @click="handleUpdate">
-        {{ loading ? "更新中..." : "更新" }}
+        {{ loading ? "更新中..." : "更新目录" }}
       </button>
 
       <span v-if="error" class="error">请求失败：{{ error }}</span>
@@ -143,12 +160,22 @@ const handleUpdate = async () => {
     <p v-if="!visibleRows.length" class="empty">暂无目录数据，请点击更新。</p>
 
     <div v-else class="tree">
-      <label
+      <div
         v-for="{ node, depth } in visibleRows"
         :key="node.path"
         class="tree-row"
         :style="{ paddingLeft: `${depth * 16}px` }"
       >
+        <button
+          v-if="node.isDir && node.children?.length"
+          type="button"
+          class="expand-button"
+          :aria-label="isExpanded(node) ? '折叠目录' : '展开目录'"
+          @click.prevent.stop="handleExpand(node)"
+        >
+          {{ isExpanded(node) ? "-" : "+" }}
+        </button>
+        <span v-else class="expand-placeholder"></span>
         <input
           type="checkbox"
           :checked="node.selected"
@@ -157,7 +184,7 @@ const handleUpdate = async () => {
         />
         <span class="node-type">{{ node.isDir ? "目录" : "文件" }}</span>
         <span>{{ node.name }}</span>
-      </label>
+      </div>
     </div>
   </section>
 </template>
@@ -167,19 +194,36 @@ const handleUpdate = async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 16px;
 }
 
 .toolbar {
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-content: space-between;
+}
+
+.toolbar h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.toolbar p {
+  margin: 4px 0 0;
+  color: #666;
+  font-size: 12px;
 }
 
 .tree {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-height: 360px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .tree-row {
@@ -187,6 +231,18 @@ const handleUpdate = async () => {
   gap: 8px;
   align-items: center;
   line-height: 1.6;
+}
+
+.expand-button,
+.expand-placeholder {
+  width: 20px;
+  flex: 0 0 20px;
+}
+
+.expand-button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
 .node-type {

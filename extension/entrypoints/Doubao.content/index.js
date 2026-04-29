@@ -19,7 +19,7 @@ export default defineContentScript({
                 console.log("来自sidepanel的消息", message)
                 console.log("插件初始化")
                 const textarea = document.querySelector(".semi-input-textarea.semi-input-textarea-autosize")
-                await toTextarea(".semi-input-textarea.semi-input-textarea-autosize", "hello-word")
+                await toTextarea(".semi-input-textarea.semi-input-textarea-autosize", message.content)
             }
         });
     },

@@ -1,54 +1,84 @@
 <script setup>
-import { ref } from "vue";
-import {usePost} from "@/core/request.js";
 import FileRequest from "@/components/FileRequest.vue";
 import FileShow from "@/components/FileShow.vue";
 import AskToAI from "@/components/AskToAI.vue";
-
-const result = ref("");
-const loading = ref(false);
-const error = ref("");
-
-async function handleRequest() {
-  loading.value = true;
-  // 只需要传接口后半段即可！
-  const res = await usePost("/example/test", {
-    example:"测试请求"
-  });
-  if (res.data) {
-    result.value=res.data
-  }
-  if (res.error) {
-    error.value = res.error;
-  }
-  loading.value = false;
-}
-async function handleToContent() {
-  const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
-  await browser.tabs.sendMessage(tab.id, {type: "form_sidepanel"});
-  console.log("成功发送消息给页面脚本")
-}
+import PromptSettings from "@/components/PromptSettings.vue";
 </script>
 
 <template>
-  <AskToAI></AskToAI>
-  <FileRequest></FileRequest>
-  <FileShow></FileShow>
-  <p>sssssssss</p>
-  <div style="margin-top: 16px;">
-    <button @click="handleRequest" :disabled="loading">
-      {{ loading ? "请求中..." : "发送 POST 请求" }}
-    </button>
+  <div class="sidepanel-page">
+    <header class="page-header">
+      <h1>WebAI Local Injector</h1>
+      <p>选择文件内容，生成并发送到当前网页。</p>
+    </header>
 
-    <p v-if="error" style="color: red;">请求失败：{{ error }}</p>
+    <main class="panel-stack">
+      <section class="card">
+        <AskToAI />
+      </section>
 
-    <pre v-if="result" style="background: #f5f5f5; padding: 12px; border-radius: 4px; white-space: pre-wrap;">{{ result }}</pre>
+      <section class="card">
+        <FileShow />
+      </section>
 
+      <details class="card collapsible">
+        <summary>忽略配置</summary>
+        <FileRequest />
+      </details>
+
+      <details class="card collapsible">
+        <summary>全局提示词</summary>
+        <PromptSettings />
+      </details>
+    </main>
   </div>
-
-  <button @click="handleToContent" >
-    call content
-  </button>
 </template>
 
-<style scoped></style>
+<style scoped>
+.sidepanel-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 14px;
+  background: #f3f4f6;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.page-header {
+  margin-bottom: 12px;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.page-header p {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.panel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+}
+
+.collapsible summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.collapsible > :not(summary) {
+  margin-top: 12px;
+}
+</style>
