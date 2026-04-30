@@ -9,6 +9,9 @@ const newProjectPath = ref("")
 const loading = ref(false)
 const error = ref("")
 const expandedPaths = ref(new Set())
+const pathInput = ref("")
+const showPathInput = ref(false)
+const showSelectedPaths = ref(false)
 
 const vIndeterminate = (el, binding) => {
   el.indeterminate = binding.value
@@ -40,6 +43,24 @@ const visibleRows = computed(() => {
   return rows
 })
 
+const selectedPaths = computed(() => {
+  const paths = []
+  const walk = (nodes = []) => {
+    nodes.forEach((node) => {
+      if (node.selected && !node.isDir) {
+        paths.push(node.path)
+      }
+      if (node.children?.length) {
+        walk(node.children)
+      }
+    })
+  }
+  walk(fileTree.value)
+  return paths
+})
+
+const selectedPathsText = computed(() => selectedPaths.value.join("\n"))
+
 const createSelectionMap = (nodes = [], map = new Map()) => {
   nodes.forEach((node) => {
     map.set(node.path, node.selected === true)
@@ -63,6 +84,17 @@ const mergeFileTree = (nodes = [], selectedMap = new Map()) => {
 const setNodeSelected = (node, selected) => {
   node.selected = selected
   node.children?.forEach((child) => setNodeSelected(child, selected))
+}
+
+const normalizeInputPath = (path) => String(path ?? "").trim().replaceAll("\\", "/")
+
+const parseInputPaths = () => {
+  return Array.from(new Set(
+    pathInput.value
+      .split(/\r?\n/)
+      .map(normalizeInputPath)
+      .filter(Boolean),
+  ))
 }
 
 const syncDirSelected = (nodes = []) => {
@@ -122,6 +154,26 @@ const saveFileSelected = async () => {
 
 const handleToggle = async (node, event) => {
   setNodeSelected(node, event.target.checked)
+  syncDirSelected(fileTree.value)
+  await saveFileSelected()
+}
+
+const applyPathSelection = async (selected) => {
+  const inputPaths = new Set(parseInputPaths())
+  if (!inputPaths.size) {
+    return
+  }
+
+  const walk = (nodes = []) => {
+    nodes.forEach((node) => {
+      if (inputPaths.has(normalizeInputPath(node.path))) {
+        setNodeSelected(node, selected)
+      } else if (node.children?.length) {
+        walk(node.children)
+      }
+    })
+  }
+  walk(fileTree.value)
   syncDirSelected(fileTree.value)
   await saveFileSelected()
 }
@@ -192,6 +244,35 @@ const handleUpdate = async () => {
       <div>
         <h2>目录更新与勾选</h2>
         <p>选择要合并到本次提问里的文件或目录。</p>
+      </div>
+      <div class="path-panel">
+        <button type="button" @click="showPathInput = !showPathInput">
+          {{ showPathInput ? "隐藏路径勾选" : "路径勾选" }}
+        </button>
+        <div v-if="showPathInput" class="path-panel-content">
+          <textarea
+            v-model="pathInput"
+            rows="5"
+            placeholder="一行一条完整相对路径"
+          ></textarea>
+          <div class="path-actions">
+            <button type="button" @click="applyPathSelection(true)">勾选</button>
+            <button type="button" @click="applyPathSelection(false)">取消勾选</button>
+          </div>
+        </div>
+      </div>
+      <div class="path-panel">
+        <button type="button" @click="showSelectedPaths = !showSelectedPaths">
+          {{ showSelectedPaths ? "隐藏已勾选" : "查看已勾选" }}
+        </button>
+        <textarea
+          v-if="showSelectedPaths"
+          class="selected-paths"
+          :value="selectedPathsText"
+          rows="5"
+          readonly
+          placeholder="暂无已勾选文件"
+        ></textarea>
       </div>
       <button type="button" :disabled="loading" @click="handleUpdate">
         {{ loading ? "更新中..." : "更新目录" }}
@@ -288,6 +369,30 @@ const handleUpdate = async () => {
   margin: 4px 0 0;
   color: #666;
   font-size: 12px;
+}
+
+.path-panel {
+  display: flex;
+  min-width: 180px;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.path-panel textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.path-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.selected-paths {
+  white-space: pre;
 }
 
 .tree {

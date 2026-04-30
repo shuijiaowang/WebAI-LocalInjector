@@ -70,13 +70,13 @@ const buildFullPrompt = (content) => {
   const parts = []
   const globalPrompts = getEnabledGlobalPrompts()
   const currentQuestion = askToAI.value.currentQuestion.trim()
-
-  if (globalPrompts.length) {
-    parts.push(`【全局提示词】\n${globalPrompts.join("\n\n")}`)
-  }
   if (currentQuestion) {
     parts.push(`【本次提问需求】\n${currentQuestion}`)
   }
+  if (globalPrompts.length) {
+    parts.push(`【全局提示词】\n${globalPrompts.join("\n\n")}`)
+  }
+
   parts.push(`【项目文件内容】\n${formatContent(content)}`)
 
   return parts.join("\n\n")
