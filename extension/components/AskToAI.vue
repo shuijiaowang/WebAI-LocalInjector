@@ -45,13 +45,34 @@ const formatContent = (content) => {
   return JSON.stringify(content, null, 2)
 }
 
+const getEnabledGlobalPrompts = () => {
+  const hasPromptList = Array.isArray(askToAI.value.globalPrompts)
+  const globalPrompts = Array.isArray(askToAI.value.globalPrompts)
+    ? askToAI.value.globalPrompts
+    : []
+  const enabledPrompts = globalPrompts
+    .filter((prompt) => prompt?.enabled !== false)
+    .map((prompt) => (typeof prompt === "string" ? prompt : prompt?.value ?? "").trim())
+    .filter(Boolean)
+
+  if (enabledPrompts.length) {
+    return enabledPrompts
+  }
+  if (hasPromptList) {
+    return []
+  }
+
+  const legacyPrompt = askToAI.value.globalPrompt?.trim()
+  return legacyPrompt ? [legacyPrompt] : []
+}
+
 const buildFullPrompt = (content) => {
   const parts = []
-  const globalPrompt = askToAI.value.globalPrompt.trim()
+  const globalPrompts = getEnabledGlobalPrompts()
   const currentQuestion = askToAI.value.currentQuestion.trim()
 
-  if (globalPrompt) {
-    parts.push(`【全局提示词】\n${globalPrompt}`)
+  if (globalPrompts.length) {
+    parts.push(`【全局提示词】\n${globalPrompts.join("\n\n")}`)
   }
   if (currentQuestion) {
     parts.push(`【本次提问需求】\n${currentQuestion}`)

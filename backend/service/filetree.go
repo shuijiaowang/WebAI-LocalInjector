@@ -17,6 +17,12 @@ type IgnoreFilter struct {
 	Exts  map[string]bool
 }
 
+type contentTreeNode struct {
+	Name       string
+	Children   []*contentTreeNode
+	childIndex map[string]*contentTreeNode
+}
+
 func (s *FileTreeService) GetFileTree(rootPath string, ignoreDirs, ignoreFiles, ignoreExts []string) ([]*response.FileNode, error) {
 	absRoot, err := filepath.Abs(rootPath)
 	if err != nil {
@@ -72,7 +78,8 @@ func (s *FileTreeService) GetFileContent(rootPath string, ignoreDirs, ignoreFile
 		selected[filepath.ToSlash(filepath.Clean(path))] = true
 	}
 
-	var builder strings.Builder
+	contentRoot := &contentTreeNode{childIndex: make(map[string]*contentTreeNode)}
+	var contentBuilder strings.Builder
 	err = filepath.WalkDir(absRoot, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -88,9 +95,6 @@ func (s *FileTreeService) GetFileContent(rootPath string, ignoreDirs, ignoreFile
 		outputPath := relPath
 		selectedPath := filepath.ToSlash(relPath)
 
-		builder.WriteString(outputPath)
-		builder.WriteString("\n")
-
 		if s.shouldIgnore(entry.Name(), entry.IsDir(), filter) {
 			if entry.IsDir() {
 				return filepath.SkipDir
@@ -98,23 +102,34 @@ func (s *FileTreeService) GetFileContent(rootPath string, ignoreDirs, ignoreFile
 			return nil
 		}
 
+		s.addContentTreePath(contentRoot, relPath)
+
 		if entry.IsDir() || !selected[selectedPath] {
 			return nil
 		}
+
+		contentBuilder.WriteString(outputPath)
+		contentBuilder.WriteString("\n")
 
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		builder.Write(content)
+		contentBuilder.Write(content)
 		if !bytes.HasSuffix(content, []byte("\n")) {
-			builder.WriteString("\n")
+			contentBuilder.WriteString("\n")
 		}
 		return nil
 	})
 	if err != nil {
 		return "", err
 	}
+
+	var builder strings.Builder
+	builder.WriteString("【目录结构】\n")
+	s.writeContentTree(&builder, contentRoot, 0)
+	builder.WriteString("\n【文件内容】\n")
+	builder.WriteString(contentBuilder.String())
 
 	return builder.String(), nil
 }
@@ -150,6 +165,35 @@ func (s *FileTreeService) shouldIgnore(name string, isDir bool, filter *IgnoreFi
 	}
 	ext := strings.ToLower(filepath.Ext(name))
 	return filter.Exts[ext]
+}
+
+func (s *FileTreeService) addContentTreePath(root *contentTreeNode, relPath string) {
+	parts := strings.Split(filepath.ToSlash(relPath), "/")
+	current := root
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		if current.childIndex == nil {
+			current.childIndex = make(map[string]*contentTreeNode)
+		}
+		child := current.childIndex[part]
+		if child == nil {
+			child = &contentTreeNode{Name: part}
+			current.childIndex[part] = child
+			current.Children = append(current.Children, child)
+		}
+		current = child
+	}
+}
+
+func (s *FileTreeService) writeContentTree(builder *strings.Builder, node *contentTreeNode, depth int) {
+	for _, child := range node.Children {
+		builder.WriteString(strings.Repeat(" ", depth))
+		builder.WriteString(child.Name)
+		builder.WriteString("\n")
+		s.writeContentTree(builder, child, depth+1)
+	}
 }
 
 func (s *FileTreeService) buildNode(parentPath, name string, filter *IgnoreFilter) *response.FileNode {

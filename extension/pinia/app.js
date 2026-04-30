@@ -47,15 +47,44 @@ export const useAppStore = defineStore('app', () => {
 
     const createAskToAIFallback = () => ({
         globalPrompt: '',
+        globalPrompts: [],
         currentQuestion: '',
         questionHistory: [],
     })
 
-    const normalizeAskToAI = (askToAI = {}) => ({
-        globalPrompt: askToAI.globalPrompt ?? '',
-        currentQuestion: askToAI.currentQuestion ?? '',
-        questionHistory: Array.isArray(askToAI.questionHistory) ? askToAI.questionHistory.slice(0, 3) : [],
-    })
+    const normalizeGlobalPrompts = (items, legacyPrompt = '') => {
+        const normalizedItems = Array.isArray(items)
+            ? items
+                .map((item) => {
+                    if (typeof item === 'string') {
+                        return { value: item, enabled: true }
+                    }
+                    return {
+                        value: item?.value ?? '',
+                        enabled: item?.enabled !== false,
+                    }
+                })
+                .filter((item) => item.value)
+            : []
+
+        if (normalizedItems.length) {
+            return normalizedItems
+        }
+
+        return legacyPrompt
+            ? [{ value: legacyPrompt, enabled: true }]
+            : []
+    }
+
+    const normalizeAskToAI = (askToAI = {}) => {
+        const globalPrompts = normalizeGlobalPrompts(askToAI.globalPrompts, askToAI.globalPrompt ?? '')
+        return {
+            globalPrompt: globalPrompts[0]?.value ?? askToAI.globalPrompt ?? '',
+            globalPrompts,
+            currentQuestion: askToAI.currentQuestion ?? '',
+            questionHistory: Array.isArray(askToAI.questionHistory) ? askToAI.questionHistory.slice(0, 3) : [],
+        }
+    }
     //用于提取fileTreeRequest中选中true的项作为请求参数请求后端
     const getSelectedIgnoreConfig = () => {
         // 解构当前文件树配置
@@ -106,7 +135,7 @@ export const useAppStore = defineStore('app', () => {
         })
         appState.askToAI=normalizeAskToAI(await appState.askToAIStorage.getValue())
         appState.saveAskToAI=async (askToAI = appState.askToAI) => {
-            await appState.askToAIStorage.setValue(toPlain(askToAI))
+            await appState.askToAIStorage.setValue(toPlain(normalizeAskToAI(askToAI)))
         }
     }
     initAppState()
