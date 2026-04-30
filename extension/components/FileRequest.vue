@@ -44,11 +44,6 @@ watch(
 
 <template>
   <section v-if="fileTreeRequest" class="file-request">
-    <label class="field">
-      <span>项目地址</span>
-      <input v-model="fileTreeRequest.rootPath" type="text" placeholder="请输入项目根目录" />
-    </label>
-
     <div v-for="group in itemGroups" :key="group.key" class="group">
       <div class="group-header">
         <span>{{ group.label }}</span>

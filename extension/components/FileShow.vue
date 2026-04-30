@@ -5,6 +5,7 @@ import { useAppStore } from "@/pinia/app.js";
 
 const appStore = useAppStore()
 
+const newProjectPath = ref("")
 const loading = ref(false)
 const error = ref("")
 const expandedPaths = ref(new Set())
@@ -16,6 +17,13 @@ const vIndeterminate = (el, binding) => {
 const fileTree = computed(() => {
   const selected = appStore.appState.fileSelected
   return Array.isArray(selected) ? selected : []
+})
+
+const currentRootPath = computed(() => appStore.appState.fileTreeRequest?.rootPath ?? "")
+
+const projectPaths = computed(() => {
+  const paths = appStore.appState.projectPaths
+  return Array.isArray(paths) ? paths : []
 })
 
 const visibleRows = computed(() => {
@@ -90,6 +98,22 @@ const handleExpand = (node) => {
   expandedPaths.value = nextPaths
 }
 
+const handleProjectChange = async (rootPath) => {
+  if (appStore.appState.switchProject) {
+    await appStore.appState.switchProject(rootPath)
+    expandedPaths.value = new Set(fileTree.value.map((node) => node.path))
+  }
+}
+
+const handleAddProject = async () => {
+  const rootPath = newProjectPath.value.trim()
+  if (!rootPath) {
+    return
+  }
+  await handleProjectChange(rootPath)
+  newProjectPath.value = ""
+}
+
 const saveFileSelected = async () => {
   if (appStore.appState.saveFileSelected) {
     await appStore.appState.saveFileSelected(fileTree.value)
@@ -145,6 +169,25 @@ const handleUpdate = async () => {
 
 <template>
   <section class="file-show">
+    <label class="project-field">
+      <span>项目地址</span>
+      <select :value="currentRootPath" @change="handleProjectChange($event.target.value)">
+        <option v-for="path in projectPaths" :key="path" :value="path">
+          {{ path }}
+        </option>
+      </select>
+    </label>
+
+    <div class="add-project-row">
+      <input
+        v-model="newProjectPath"
+        type="text"
+        placeholder="输入新项目根目录后添加并切换"
+        @keyup.enter="handleAddProject"
+      />
+      <button type="button" @click="handleAddProject">添加项目</button>
+    </div>
+
     <div class="toolbar">
       <div>
         <h2>目录更新与勾选</h2>
@@ -183,7 +226,7 @@ const handleUpdate = async () => {
           @change="handleToggle(node, $event)"
         />
         <span class="node-type">{{ node.isDir ? "目录" : "文件" }}</span>
-        <span>{{ node.name }}</span>
+        <span class="node-name">{{ node.name }}</span>
       </div>
     </div>
   </section>
@@ -192,15 +235,48 @@ const handleUpdate = async () => {
 <style scoped>
 .file-show {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 12px;
 }
 
+.project-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.project-field select,
+.add-project-row input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.add-project-row {
+  display: flex;
+  gap: 8px;
+}
+
+.add-project-row input {
+  flex: 1;
+}
+
+.add-project-row button {
+  flex: 0 0 auto;
+}
+
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   justify-content: space-between;
+}
+
+.toolbar > div {
+  min-width: 0;
 }
 
 .toolbar h2 {
@@ -246,8 +322,14 @@ const handleUpdate = async () => {
 }
 
 .node-type {
+  flex: 0 0 auto;
   color: #666;
   font-size: 12px;
+}
+
+.node-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .empty {

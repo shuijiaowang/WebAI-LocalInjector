@@ -239,12 +239,14 @@ watch(
 <style scoped>
 .ask-to-ai {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 12px;
 }
 
 .field {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 6px;
 }
@@ -255,18 +257,26 @@ watch(
 }
 
 textarea {
+  display: block;
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
   resize: vertical;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .history {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 6px;
 }
 
 .history-item {
+  min-width: 0;
   overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
@@ -282,6 +292,8 @@ textarea {
 
 .prompt-result {
   display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   justify-content: space-between;
@@ -307,6 +319,7 @@ textarea {
 }
 
 .prompt-preview {
+  min-width: 0;
   color: #444;
 }
 

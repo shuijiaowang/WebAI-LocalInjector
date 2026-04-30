@@ -45,6 +45,25 @@ export const useAppStore = defineStore('app', () => {
         }
     }
 
+    const normalizeProjectPaths = (paths = [], currentRootPath = '') => {
+        const normalized = Array.isArray(paths)
+            ? paths.map((path) => String(path).trim()).filter(Boolean)
+            : []
+        if (currentRootPath) {
+            normalized.unshift(currentRootPath)
+        }
+        return Array.from(new Set(normalized))
+    }
+
+    const normalizeFileSelectedByRootPath = (selectedMap = {}) => {
+        if (!selectedMap || typeof selectedMap !== 'object' || Array.isArray(selectedMap)) {
+            return {}
+        }
+        return Object.fromEntries(
+            Object.entries(selectedMap).filter(([, value]) => Array.isArray(value)),
+        )
+    }
+
     const createAskToAIFallback = () => ({
         globalPrompt: '',
         globalPrompts: [],
@@ -109,7 +128,9 @@ export const useAppStore = defineStore('app', () => {
     //全局状态
     const appState =reactive({
         fileTreeRequest: createFileTreeRequestFallback(),
+        projectPaths: [],
         fileSelected: [],
+        fileSelectedByRootPath: {},
         askToAI: createAskToAIFallback(),
     })
     const initAppState=async ()=>{
@@ -121,13 +142,60 @@ export const useAppStore = defineStore('app', () => {
         }
         appState.fileTreeRequest=normalizeFileTreeRequest(await appState.fileTreeRequestStorage.getValue())
 
+        appState.projectPathsStorage=storage.defineItem(`local:projectPaths`, {
+            fallback: []
+        })
+        appState.projectPaths=normalizeProjectPaths(
+            await appState.projectPathsStorage.getValue(),
+            appState.fileTreeRequest.rootPath,
+        )
+        appState.saveProjectPaths=async (paths = appState.projectPaths) => {
+            appState.projectPaths = normalizeProjectPaths(paths, appState.fileTreeRequest.rootPath)
+            await appState.projectPathsStorage.setValue(toPlain(appState.projectPaths))
+        }
+
         appState.fileSelectedStorage=storage.defineItem(`local:fileSelected`, {
             fallback: []
         })
         const storedFileSelected=await appState.fileSelectedStorage.getValue()
-        appState.fileSelected=Array.isArray(storedFileSelected) ? storedFileSelected : []
+        appState.fileSelectedByRootPathStorage=storage.defineItem(`local:fileSelectedByRootPath`, {
+            fallback: {}
+        })
+        appState.fileSelectedByRootPath=normalizeFileSelectedByRootPath(
+            await appState.fileSelectedByRootPathStorage.getValue(),
+        )
+        if (
+            appState.fileTreeRequest.rootPath
+            && !appState.fileSelectedByRootPath[appState.fileTreeRequest.rootPath]
+            && Array.isArray(storedFileSelected)
+        ) {
+            appState.fileSelectedByRootPath[appState.fileTreeRequest.rootPath] = storedFileSelected
+        }
+        appState.fileSelected=Array.isArray(appState.fileSelectedByRootPath[appState.fileTreeRequest.rootPath])
+            ? appState.fileSelectedByRootPath[appState.fileTreeRequest.rootPath]
+            : []
         appState.saveFileSelected=async (fileSelected = appState.fileSelected) => {
+            appState.fileSelected = fileSelected
+            appState.fileSelectedByRootPath[appState.fileTreeRequest.rootPath] = toPlain(fileSelected)
+            await appState.fileSelectedByRootPathStorage.setValue(toPlain(appState.fileSelectedByRootPath))
             await appState.fileSelectedStorage.setValue(toPlain(fileSelected))
+        }
+        appState.switchProject=async (rootPath) => {
+            const nextRootPath = String(rootPath ?? '').trim()
+            if (!nextRootPath) {
+                return
+            }
+            await appState.saveFileSelected()
+            appState.fileTreeRequest.rootPath = nextRootPath
+            if (!appState.projectPaths.includes(nextRootPath)) {
+                appState.projectPaths.push(nextRootPath)
+                await appState.saveProjectPaths()
+            }
+            appState.fileSelected = Array.isArray(appState.fileSelectedByRootPath[nextRootPath])
+                ? appState.fileSelectedByRootPath[nextRootPath]
+                : []
+            await appState.saveFileTreeRequest()
+            await appState.saveFileSelected()
         }
 
         appState.askToAIStorage=storage.defineItem(`local:askToAI`, {

@@ -38,6 +38,7 @@ import PromptSettings from "@/components/PromptSettings.vue";
 .sidepanel-page {
   min-height: 100vh;
   box-sizing: border-box;
+  overflow-x: hidden;
   padding: 14px;
   background: #f3f4f6;
   color: #1f2937;
@@ -61,11 +62,14 @@ import PromptSettings from "@/components/PromptSettings.vue";
 
 .panel-stack {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 12px;
 }
 
 .card {
+  min-width: 0;
+  box-sizing: border-box;
   padding: 12px;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
