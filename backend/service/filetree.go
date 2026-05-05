@@ -20,6 +20,7 @@ type IgnoreFilter struct {
 
 type contentTreeNode struct {
 	Name       string
+	IsDir      bool
 	Children   []*contentTreeNode
 	childIndex map[string]*contentTreeNode
 }
@@ -96,7 +97,7 @@ func (s *FileTreeService) GetFileContent(rootPath string, ignoreDirs, ignoreFile
 		selected[filepath.ToSlash(filepath.Clean(path))] = true
 	}
 
-	contentRoot := &contentTreeNode{childIndex: make(map[string]*contentTreeNode)}
+	contentRoot := &contentTreeNode{IsDir: true, childIndex: make(map[string]*contentTreeNode)}
 	var contentBuilder strings.Builder
 	err = filepath.WalkDir(absRoot, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -120,7 +121,7 @@ func (s *FileTreeService) GetFileContent(rootPath string, ignoreDirs, ignoreFile
 			return nil
 		}
 
-		s.addContentTreePath(contentRoot, relPath)
+		s.addContentTreePath(contentRoot, relPath, entry.IsDir())
 
 		if entry.IsDir() || !selected[selectedPath] {
 			return nil
@@ -145,8 +146,8 @@ func (s *FileTreeService) GetFileContent(rootPath string, ignoreDirs, ignoreFile
 	}
 
 	var builder strings.Builder
-	builder.WriteString("【目录结构】\n")
-	s.writeContentTree(&builder, contentRoot, 0)
+	builder.WriteString("【目录极简结构】\n")
+	s.writeContentTree(&builder, contentRoot, "")
 	builder.WriteString("\n【文件内容】\n")
 	builder.WriteString(contentBuilder.String())
 
@@ -218,10 +219,10 @@ func (s *FileTreeService) shouldIgnore(name string, isDir bool, filter *IgnoreFi
 	return filter.Exts[ext]
 }
 
-func (s *FileTreeService) addContentTreePath(root *contentTreeNode, relPath string) {
+func (s *FileTreeService) addContentTreePath(root *contentTreeNode, relPath string, isDir bool) {
 	parts := strings.Split(filepath.ToSlash(relPath), "/")
 	current := root
-	for _, part := range parts {
+	for i, part := range parts {
 		if part == "" {
 			continue
 		}
@@ -234,17 +235,176 @@ func (s *FileTreeService) addContentTreePath(root *contentTreeNode, relPath stri
 			current.childIndex[part] = child
 			current.Children = append(current.Children, child)
 		}
+		if i < len(parts)-1 {
+			child.IsDir = true
+		} else {
+			child.IsDir = isDir
+		}
 		current = child
 	}
 }
 
-func (s *FileTreeService) writeContentTree(builder *strings.Builder, node *contentTreeNode, depth int) {
+func (s *FileTreeService) writeContentTree(builder *strings.Builder, node *contentTreeNode, currentPath string) {
+	wroteSection := false
 	for _, child := range node.Children {
-		builder.WriteString(strings.Repeat(" ", depth))
+		if !child.IsDir {
+			continue
+		}
+		if !s.hasContentTreeOutput(child) {
+			continue
+		}
+
+		if wroteSection {
+			builder.WriteString("\n")
+		}
+		wroteSection = true
 		builder.WriteString(child.Name)
 		builder.WriteString("\n")
-		s.writeContentTree(builder, child, depth+1)
+		s.writeContentTreeSection(builder, child, currentPath, true)
 	}
+}
+
+func (s *FileTreeService) writeContentTreeSection(builder *strings.Builder, node *contentTreeNode, parentPath string, writeRootFiles bool) {
+	for _, child := range node.Children {
+		if !child.IsDir || !s.hasContentTreeOutput(child) {
+			continue
+		}
+
+		childPath := child.Name
+		if parentPath != "" {
+			childPath = parentPath + "/" + child.Name
+		}
+
+		if s.hasContentTreeFiles(child) && s.hasContentTreeDirs(child) {
+			builder.WriteString(" ")
+			builder.WriteString(childPath)
+			builder.WriteString(":")
+			builder.WriteString(s.formatContentTreeNames(child))
+			builder.WriteString("\n")
+			continue
+		}
+
+		if files := s.formatContentTreeFiles(child, false); files != "" {
+			builder.WriteString(" ")
+			builder.WriteString(childPath)
+			builder.WriteString(":")
+			builder.WriteString(files)
+			builder.WriteString("\n")
+		}
+		s.writeContentTreeSection(builder, child, childPath, false)
+	}
+
+	if writeRootFiles {
+		if files := s.formatContentTreeFiles(node, true); files != "" {
+			builder.WriteString(" ")
+			builder.WriteString(files)
+			builder.WriteString("\n")
+		}
+	}
+}
+
+func (s *FileTreeService) hasContentTreeOutput(node *contentTreeNode) bool {
+	for _, child := range node.Children {
+		if !child.IsDir || s.hasContentTreeOutput(child) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *FileTreeService) hasContentTreeFiles(node *contentTreeNode) bool {
+	for _, child := range node.Children {
+		if !child.IsDir {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *FileTreeService) hasContentTreeDirs(node *contentTreeNode) bool {
+	for _, child := range node.Children {
+		if child.IsDir && s.hasContentTreeOutput(child) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *FileTreeService) formatContentTreeNames(node *contentTreeNode) string {
+	var names []string
+	for _, child := range node.Children {
+		if child.IsDir {
+			if s.hasContentTreeOutput(child) {
+				names = append(names, child.Name)
+			}
+			continue
+		}
+		names = append(names, strings.TrimSuffix(child.Name, filepath.Ext(child.Name)))
+	}
+	return strings.Join(names, "/")
+}
+
+func (s *FileTreeService) formatContentTreeFiles(node *contentTreeNode, rootFiles bool) string {
+	type extGroup struct {
+		ext   string
+		names []string
+	}
+
+	var groups []extGroup
+	groupIndex := make(map[string]int)
+	totalFiles := 0
+
+	for _, child := range node.Children {
+		if child.IsDir {
+			continue
+		}
+
+		totalFiles++
+		ext := filepath.Ext(child.Name)
+		name := strings.TrimSuffix(child.Name, ext)
+		index, ok := groupIndex[ext]
+		if !ok {
+			groups = append(groups, extGroup{ext: ext})
+			index = len(groups) - 1
+			groupIndex[ext] = index
+		}
+		groups[index].names = append(groups[index].names, name)
+	}
+
+	if totalFiles == 0 {
+		return ""
+	}
+
+	if rootFiles {
+		var files []string
+		for _, child := range node.Children {
+			if !child.IsDir {
+				files = append(files, child.Name)
+			}
+		}
+		return strings.Join(files, " ")
+	}
+
+	parts := make([]string, 0, len(groups))
+	hasMergedExt := false
+	for _, group := range groups {
+		if group.ext != "" && len(group.names) > 1 {
+			hasMergedExt = true
+			parts = append(parts, "{"+strings.Join(group.names, ",")+"}"+group.ext)
+			continue
+		}
+		if group.ext == "" && len(group.names) > 1 {
+			hasMergedExt = true
+			parts = append(parts, "{"+strings.Join(group.names, ",")+"}")
+			continue
+		}
+		parts = append(parts, group.names[0]+group.ext)
+	}
+
+	if len(parts) > 1 && !hasMergedExt {
+		return "{" + strings.Join(parts, ",") + "}"
+	}
+	return strings.Join(parts, ",")
 }
 
 func (s *FileTreeService) buildNode(parentPath, name string, filter *IgnoreFilter) *response.FileNode {
