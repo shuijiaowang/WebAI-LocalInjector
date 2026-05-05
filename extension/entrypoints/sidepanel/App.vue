@@ -13,6 +13,11 @@ import PromptSettings from "@/components/PromptSettings.vue";
     </header>
 
     <main class="panel-stack">
+      <details class="card collapsible">
+        <summary>全局提示词</summary>
+        <PromptSettings />
+      </details>
+
       <section class="card">
         <AskToAI />
       </section>
@@ -25,11 +30,6 @@ import PromptSettings from "@/components/PromptSettings.vue";
         <summary>忽略配置</summary>
         <FileRequest />
       </details>
-
-      <details class="card collapsible">
-        <summary>全局提示词</summary>
-        <PromptSettings />
-      </details>
     </main>
   </div>
 </template>
@@ -39,14 +39,14 @@ import PromptSettings from "@/components/PromptSettings.vue";
   min-height: 100vh;
   box-sizing: border-box;
   overflow-x: hidden;
-  padding: 14px;
-  background: #f3f4f6;
+  padding: 16px;
+  background: #f3f6fb;
   color: #1f2937;
   font-size: 14px;
 }
 
 .page-header {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .page-header h1 {
@@ -64,17 +64,17 @@ import PromptSettings from "@/components/PromptSettings.vue";
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .card {
   min-width: 0;
   box-sizing: border-box;
-  padding: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
   background: #fff;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 6%);
 }
 
 .collapsible summary {

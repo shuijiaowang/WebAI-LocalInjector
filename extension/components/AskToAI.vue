@@ -198,8 +198,8 @@ watch(
       />
     </label>
 
-    <div v-if="askToAI.questionHistory.length" class="history">
-      <div class="history-title">近三次提问需求</div>
+    <details v-if="askToAI.questionHistory.length" class="history">
+      <summary class="history-title">近十次提问需求</summary>
       <button
         v-for="question in askToAI.questionHistory"
         :key="question"
@@ -209,10 +209,10 @@ watch(
       >
         {{ question }}
       </button>
-    </div>
+    </details>
 
     <div class="toolbar">
-      <button type="button" :disabled="contentLoading" @click="handlePrintContent">
+      <button type="button" class="primary-action" :disabled="contentLoading" @click="handlePrintContent">
         {{ contentLoading ? "输出中..." : "输出内容" }}
       </button>
       <span v-if="insertStatus" class="copy-status">{{ insertStatus }}</span>
@@ -273,6 +273,10 @@ textarea {
   min-width: 0;
   flex-direction: column;
   gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid #e6ebf2;
+  border-radius: 10px;
+  background: #f8fbff;
 }
 
 .history-item {
@@ -283,11 +287,27 @@ textarea {
   white-space: nowrap;
 }
 
+.history-title {
+  cursor: pointer;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+.primary-action {
+  border-color: #2f6df6;
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  color: #fff;
+  box-shadow: 0 6px 14px rgb(37 99 235 / 22%);
+}
+
+.primary-action:hover {
+  border-color: #1d4ed8;
+  filter: brightness(0.98);
 }
 
 .prompt-result {

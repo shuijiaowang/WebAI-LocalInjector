@@ -274,7 +274,7 @@ const handleUpdate = async () => {
           placeholder="暂无已勾选文件"
         ></textarea>
       </div>
-      <button type="button" :disabled="loading" @click="handleUpdate">
+      <button type="button" class="primary-action" :disabled="loading" @click="handleUpdate">
         {{ loading ? "更新中..." : "更新目录" }}
       </button>
 
@@ -351,7 +351,7 @@ const handleUpdate = async () => {
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
   justify-content: space-between;
 }
@@ -444,5 +444,17 @@ const handleUpdate = async () => {
 
 .error {
   color: #d93025;
+}
+
+.primary-action {
+  border-color: #2f6df6;
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  color: #fff;
+  box-shadow: 0 6px 14px rgb(37 99 235 / 22%);
+}
+
+.primary-action:hover {
+  border-color: #1d4ed8;
+  filter: brightness(0.98);
 }
 </style>

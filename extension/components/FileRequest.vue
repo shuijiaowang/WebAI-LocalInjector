@@ -47,33 +47,6 @@ watch(
 
 <template>
   <section v-if="fileTreeRequest" class="file-request">
-    <div v-for="group in itemGroups" :key="group.key" class="group">
-      <div class="group-header">
-        <span>{{ group.label }}</span>
-      </div>
-
-      <div class="add-row">
-        <input
-          v-model="newItems[group.key]"
-          type="text"
-          :placeholder="group.placeholder"
-          @keyup.enter="addItem(group.key)"
-        />
-        <button type="button" @click="addItem(group.key)">新增</button>
-      </div>
-
-      <div v-for="(item, index) in fileTreeRequest[group.key]" :key="`${group.key}-${index}`" class="item-row">
-        <label class="enable">
-          <input v-model="item.enabled" type="checkbox" />
-          启用
-        </label>
-        <input v-model="item.value" type="text" />
-        <button type="button" @click="removeItem(group.key, index)">删除</button>
-      </div>
-
-      <p v-if="!fileTreeRequest[group.key]?.length" class="empty">暂无配置</p>
-    </div>
-
     <div class="group">
       <div class="group-header">
         <span>内容过滤</span>
@@ -107,6 +80,33 @@ watch(
 
       <p v-if="!contentFilters.length" class="empty">暂无配置</p>
     </div>
+
+    <div v-for="group in itemGroups" :key="group.key" class="group">
+      <div class="group-header">
+        <span>{{ group.label }}</span>
+      </div>
+
+      <div class="add-row">
+        <input
+          v-model="newItems[group.key]"
+          type="text"
+          :placeholder="group.placeholder"
+          @keyup.enter="addItem(group.key)"
+        />
+        <button type="button" @click="addItem(group.key)">新增</button>
+      </div>
+
+      <div v-for="(item, index) in fileTreeRequest[group.key]" :key="`${group.key}-${index}`" class="item-row">
+        <label class="enable">
+          <input v-model="item.enabled" type="checkbox" />
+          启用
+        </label>
+        <input v-model="item.value" type="text" />
+        <button type="button" @click="removeItem(group.key, index)">删除</button>
+      </div>
+
+      <p v-if="!fileTreeRequest[group.key]?.length" class="empty">暂无配置</p>
+    </div>
   </section>
 </template>
 
@@ -122,6 +122,10 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 10px;
+  border: 1px solid #e8edf4;
+  border-radius: 10px;
+  background: #fbfcff;
 }
 
 .field span,
