@@ -3,6 +3,53 @@ import { reactive } from 'vue'
 import {toPlain} from "@/core/toPlain.js";
 export const useAppStore = defineStore('app', () => {
 
+    const createContentFiltersFallback = () => [
+        {
+            value: "go",
+            label: "Go",
+            request: false,
+            enabled: false,
+            children: [
+                { value: "goImport", label: "import", enabled: false },
+                { value: "goFunctionBody", label: "函数体过滤", enabled: false },
+            ],
+        },
+        {
+            value: "js",
+            label: "JS",
+            request: false,
+            enabled: false,
+            children: [
+                { value: "jsFunctionBody", label: "函数体过滤", enabled: false },
+            ],
+        },
+        {
+            value: "vue",
+            label: "Vue",
+            request: false,
+            enabled: false,
+            children: [
+                {
+                    value: "vueScript",
+                    label: "script",
+                    enabled: false,
+                    children: [
+                        { value: "vueScriptFunctionBody", label: "函数的函数体过滤", enabled: false },
+                    ],
+                },
+                {
+                    value: "vueTemplate",
+                    label: "template",
+                    enabled: false,
+                    children: [
+                        { value: "vueTemplateTagAttrs", label: "去掉标签属性", enabled: false },
+                    ],
+                },
+                { value: "vueStyle", label: "style", enabled: false },
+            ],
+        },
+    ]
+
     const createFileTreeRequestFallback = () => ({
         rootPath: "D:\\project\\test\\WebAI-LocalInjector",
         ignoreDirs: [
@@ -21,13 +68,7 @@ export const useAppStore = defineStore('app', () => {
             { value: ".svg", enabled: true },
             { value: ".ico", enabled: true },
         ],
-        contentFilters: [
-            { value: "goFunctionBody", label: "Go 函数体", enabled: false },
-            { value: "goImport", label: "Go import", enabled: false },
-            { value: "jsFunctionBody", label: "JS 函数体", enabled: false },
-            { value: "vueStyle", label: "Vue style", enabled: false },
-            { value: "otherFileReserved", label: "其他文件类型（预留）", enabled: false },
-        ],
+        contentFilters: createContentFiltersFallback(),
     })
 
     const normalizeIgnoreItems = (items = []) => items
@@ -43,16 +84,32 @@ export const useAppStore = defineStore('app', () => {
         })
         .filter((item) => item.value)
 
+    const flattenContentFilterItems = (items = []) => items.flatMap((item) => {
+        if (typeof item === 'string') {
+            return [{ value: item, enabled: true }]
+        }
+        const current = item?.value
+            ? [{ value: item.value, enabled: item.enabled !== false }]
+            : []
+        return current.concat(flattenContentFilterItems(item?.children ?? []))
+    })
+
     const normalizeContentFilters = (items = []) => {
-        const fallback = createFileTreeRequestFallback().contentFilters
-        const storedItems = normalizeIgnoreItems(items)
-        const storedMap = new Map(storedItems.map(item => [item.value, item]))
-        return fallback.map((item) => {
+        const fallback = createContentFiltersFallback()
+        const storedMap = new Map(flattenContentFilterItems(items).map(item => [item.value, item]))
+        const mergeItems = (fallbackItems) => fallbackItems.map((item) => {
             const storedItem = storedMap.get(item.value)
-            return storedItem
+            const children = item.children
+                ? mergeItems(item.children)
+                : undefined
+            const mergedItem = storedItem
                 ? { ...item, enabled: storedItem.enabled }
                 : item
+            return children
+                ? { ...mergedItem, children }
+                : mergedItem
         })
+        return mergeItems(fallback)
     }
 
     const normalizeFileTreeRequest = (request = {}) => {
@@ -137,13 +194,23 @@ export const useAppStore = defineStore('app', () => {
                 .map(item => item.value);     // 只保留值
         };
 
+        const filterEnabledContentFilters = (itemList) => {
+            return itemList
+                .flatMap((item) => {
+                    const current = item.enabled && item.request !== false
+                        ? [item.value]
+                        : []
+                    return current.concat(filterEnabledContentFilters(item.children ?? []))
+                });
+        };
+
         // 返回你需要的格式
         return {
             rootPath: rootPath,
             ignoreDirs: filterEnabledItems(ignoreDirs),
             ignoreFiles: filterEnabledItems(ignoreFiles),
             ignoreExts: filterEnabledItems(ignoreExts),
-            contentFilters: filterEnabledItems(contentFilters),
+            contentFilters: filterEnabledContentFilters(contentFilters),
         };
     };
 

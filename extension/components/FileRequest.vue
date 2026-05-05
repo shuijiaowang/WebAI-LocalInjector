@@ -18,6 +18,8 @@ const newItems = reactive({
 const fileTreeRequest = computed(() => appStore.appState.fileTreeRequest)
 const contentFilters = computed(() => fileTreeRequest.value?.contentFilters ?? [])
 
+const hasChildren = (item) => Boolean(item.children?.length)
+
 const addItem = (key) => {
   const value = newItems[key].trim()
   if (!value) {
@@ -77,11 +79,30 @@ watch(
         <span>内容过滤</span>
       </div>
 
-      <div v-for="item in contentFilters" :key="item.value" class="filter-row">
-        <label class="enable">
-          <input v-model="item.enabled" type="checkbox" />
-          {{ item.label || item.value }}
-        </label>
+      <div v-for="item in contentFilters" :key="item.value" class="filter-group">
+        <div class="filter-row">
+          <label v-if="item.request !== false" class="enable">
+            <input v-model="item.enabled" type="checkbox" />
+            {{ item.label || item.value }}
+          </label>
+          <span v-else class="filter-label">{{ item.label || item.value }}</span>
+        </div>
+
+        <div v-if="hasChildren(item)" class="filter-children">
+          <div v-for="child in item.children" :key="child.value" class="filter-child">
+            <label class="enable">
+              <input v-model="child.enabled" type="checkbox" />
+              {{ child.label || child.value }}
+            </label>
+
+            <div v-if="hasChildren(child)" class="filter-children">
+              <label v-for="grandChild in child.children" :key="grandChild.value" class="enable filter-child">
+                <input v-model="grandChild.enabled" type="checkbox" />
+                {{ grandChild.label || grandChild.value }}
+              </label>
+            </div>
+          </div>
+        </div>
       </div>
 
       <p v-if="!contentFilters.length" class="empty">暂无配置</p>
@@ -104,7 +125,8 @@ watch(
 }
 
 .field span,
-.group-header {
+.group-header,
+.filter-label {
   font-weight: 600;
 }
 
@@ -114,6 +136,20 @@ watch(
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.filter-group,
+.filter-child {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-children {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: 24px;
 }
 
 input[type="text"] {

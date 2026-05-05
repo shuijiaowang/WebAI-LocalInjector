@@ -29,7 +29,12 @@ const (
 	contentFilterGoFunctionBody = "goFunctionBody"
 	contentFilterGoImport       = "goImport"
 	contentFilterJsFunctionBody = "jsFunctionBody"
+	contentFilterVueScript      = "vueScript"
+	contentFilterVueTemplate    = "vueTemplate"
 	contentFilterVueStyle       = "vueStyle"
+
+	contentFilterVueScriptFunctionBody = "vueScriptFunctionBody"
+	contentFilterVueTemplateTagAttrs   = "vueTemplateTagAttrs"
 )
 
 var (
@@ -38,6 +43,8 @@ var (
 	goFunctionBodyRegexp      = regexp.MustCompile(`(?ms)^(\s*func\s+(?:\([^{}\n]*\)\s*)?[A-Za-z_]\w*\s*\([^{}]*\)\s*(?:\([^{}]*\)|[^{\n]*)?)\s*\{.*?^\}`)
 	jsFunctionBodyRegexp      = regexp.MustCompile(`(?ms)^(\s*(?:export\s+)?(?:async\s+)?function\s+[$A-Za-z_][$\w]*\s*\([^)]*\)\s*)\{.*?^\}`)
 	jsArrowFunctionBodyRegexp = regexp.MustCompile(`(?ms)^(\s*(?:export\s+)?(?:const|let|var)\s+[$A-Za-z_][$\w]*\s*=\s*(?:async\s*)?(?:\([^)]*\)|[$A-Za-z_][$\w]*)\s*=>\s*)\{.*?^\}`)
+	vueScriptRegexp           = regexp.MustCompile(`(?is)<script(?:\s[^>]*)?>.*?</script>`)
+	vueTemplateRegexp         = regexp.MustCompile(`(?is)<template(?:\s[^>]*)?>.*?</template>`)
 	vueStyleRegexp            = regexp.MustCompile(`(?is)<style(?:\s[^>]*)?>.*?</style>\s*`)
 )
 
@@ -175,15 +182,112 @@ func (s *FileTreeService) filterContent(path, content string, filter map[string]
 		}
 	case ".js", ".mjs", ".cjs":
 		if filter[contentFilterJsFunctionBody] {
-			content = jsFunctionBodyRegexp.ReplaceAllString(content, "$1{}")
-			content = jsArrowFunctionBodyRegexp.ReplaceAllString(content, "$1{}")
+			content = s.filterJsFunctionBodies(content)
 		}
 	case ".vue":
+		if filter[contentFilterVueScript] {
+			content = vueScriptRegexp.ReplaceAllString(content, "")
+		} else if filter[contentFilterVueScriptFunctionBody] {
+			content = vueScriptRegexp.ReplaceAllStringFunc(content, s.filterJsFunctionBodies)
+		}
+		if filter[contentFilterVueTemplate] {
+			content = vueTemplateRegexp.ReplaceAllString(content, "")
+		} else if filter[contentFilterVueTemplateTagAttrs] {
+			content = vueTemplateRegexp.ReplaceAllStringFunc(content, s.removeTagAttributes)
+		}
 		if filter[contentFilterVueStyle] {
 			content = vueStyleRegexp.ReplaceAllString(content, "")
 		}
 	}
 	return content
+}
+
+func (s *FileTreeService) filterJsFunctionBodies(content string) string {
+	content = jsFunctionBodyRegexp.ReplaceAllString(content, "$1{}")
+	return jsArrowFunctionBodyRegexp.ReplaceAllString(content, "$1{}")
+}
+
+func (s *FileTreeService) removeTagAttributes(content string) string {
+	var builder strings.Builder
+	for i := 0; i < len(content); {
+		if content[i] != '<' {
+			builder.WriteByte(content[i])
+			i++
+			continue
+		}
+
+		if i+1 >= len(content) || content[i+1] == '/' || content[i+1] == '!' || content[i+1] == '?' {
+			next := strings.IndexByte(content[i:], '>')
+			if next == -1 {
+				builder.WriteString(content[i:])
+				break
+			}
+			builder.WriteString(content[i : i+next+1])
+			i += next + 1
+			continue
+		}
+
+		nameStart := i + 1
+		nameEnd := nameStart
+		for nameEnd < len(content) && isVueTagNameChar(content[nameEnd]) {
+			nameEnd++
+		}
+		if nameEnd == nameStart {
+			builder.WriteByte(content[i])
+			i++
+			continue
+		}
+
+		tagEnd := scanTagEnd(content, nameEnd)
+		if tagEnd == -1 {
+			builder.WriteString(content[i:])
+			break
+		}
+
+		builder.WriteByte('<')
+		builder.WriteString(content[nameStart:nameEnd])
+		if isSelfClosingTag(content[nameEnd:tagEnd]) {
+			builder.WriteString(" /")
+		}
+		builder.WriteByte('>')
+		i = tagEnd + 1
+	}
+	return builder.String()
+}
+
+func isVueTagNameChar(ch byte) bool {
+	return ch == '-' || ch == '_' || ch == ':' || ch == '.' || ('0' <= ch && ch <= '9') || ('A' <= ch && ch <= 'Z') || ('a' <= ch && ch <= 'z')
+}
+
+func scanTagEnd(content string, start int) int {
+	var quote byte
+	for i := start; i < len(content); i++ {
+		ch := content[i]
+		if quote != 0 {
+			if ch == quote {
+				quote = 0
+			}
+			continue
+		}
+		if ch == '"' || ch == '\'' {
+			quote = ch
+			continue
+		}
+		if ch == '>' {
+			return i
+		}
+	}
+	return -1
+}
+
+func isSelfClosingTag(attrs string) bool {
+	for i := len(attrs) - 1; i >= 0; i-- {
+		if attrs[i] == ' ' || attrs[i] == '\t' || attrs[i] == '\n' || attrs[i] == '\r' {
+			continue
+		}
+		return attrs[i] == '/'
+	}
+	return false
 }
 
 func (s *FileTreeService) newIgnoreFilter(ignoreDirs, ignoreFiles, ignoreExts []string) *IgnoreFilter {
