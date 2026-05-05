@@ -9,5 +9,6 @@ type FileTreeRequest struct {
 
 type FileContentRequest struct {
 	FileTreeRequest
-	SelectedPaths []string `json:"selectedPaths"`
+	SelectedPaths  []string `json:"selectedPaths"`
+	ContentFilters []string `json:"contentFilters"`
 }

@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -22,6 +23,22 @@ type contentTreeNode struct {
 	Children   []*contentTreeNode
 	childIndex map[string]*contentTreeNode
 }
+
+const (
+	contentFilterGoFunctionBody = "goFunctionBody"
+	contentFilterGoImport       = "goImport"
+	contentFilterJsFunctionBody = "jsFunctionBody"
+	contentFilterVueStyle       = "vueStyle"
+)
+
+var (
+	goImportBlockRegexp       = regexp.MustCompile(`(?ms)^\s*import\s*\(.*?^\s*\)\s*\n?`)
+	goImportLineRegexp        = regexp.MustCompile(`(?m)^\s*import\s+(?:\S+\s+)?"[^"]+"\s*\n?`)
+	goFunctionBodyRegexp      = regexp.MustCompile(`(?ms)^(\s*func\s+(?:\([^{}\n]*\)\s*)?[A-Za-z_]\w*\s*\([^{}]*\)\s*(?:\([^{}]*\)|[^{\n]*)?)\s*\{.*?^\}`)
+	jsFunctionBodyRegexp      = regexp.MustCompile(`(?ms)^(\s*(?:export\s+)?(?:async\s+)?function\s+[$A-Za-z_][$\w]*\s*\([^)]*\)\s*)\{.*?^\}`)
+	jsArrowFunctionBodyRegexp = regexp.MustCompile(`(?ms)^(\s*(?:export\s+)?(?:const|let|var)\s+[$A-Za-z_][$\w]*\s*=\s*(?:async\s*)?(?:\([^)]*\)|[$A-Za-z_][$\w]*)\s*=>\s*)\{.*?^\}`)
+	vueStyleRegexp            = regexp.MustCompile(`(?is)<style(?:\s[^>]*)?>.*?</style>\s*`)
+)
 
 func (s *FileTreeService) GetFileTree(rootPath string, ignoreDirs, ignoreFiles, ignoreExts []string) ([]*response.FileNode, error) {
 	absRoot, err := filepath.Abs(rootPath)
@@ -58,7 +75,7 @@ func (s *FileTreeService) GetFileTree(rootPath string, ignoreDirs, ignoreFiles, 
 	return result, nil
 }
 
-func (s *FileTreeService) GetFileContent(rootPath string, ignoreDirs, ignoreFiles, ignoreExts, selectedPaths []string) (string, error) {
+func (s *FileTreeService) GetFileContent(rootPath string, ignoreDirs, ignoreFiles, ignoreExts, selectedPaths, contentFilters []string) (string, error) {
 	absRoot, err := filepath.Abs(rootPath)
 	if err != nil {
 		return "", err
@@ -73,6 +90,7 @@ func (s *FileTreeService) GetFileContent(rootPath string, ignoreDirs, ignoreFile
 	}
 
 	filter := s.newIgnoreFilter(ignoreDirs, ignoreFiles, ignoreExts)
+	contentFilter := s.newContentFilter(contentFilters)
 	selected := make(map[string]bool)
 	for _, path := range selectedPaths {
 		selected[filepath.ToSlash(filepath.Clean(path))] = true
@@ -115,6 +133,7 @@ func (s *FileTreeService) GetFileContent(rootPath string, ignoreDirs, ignoreFile
 		if err != nil {
 			return err
 		}
+		content = []byte(s.filterContent(outputPath, string(content), contentFilter))
 		contentBuilder.Write(content)
 		if !bytes.HasSuffix(content, []byte("\n")) {
 			contentBuilder.WriteString("\n")
@@ -132,6 +151,38 @@ func (s *FileTreeService) GetFileContent(rootPath string, ignoreDirs, ignoreFile
 	builder.WriteString(contentBuilder.String())
 
 	return builder.String(), nil
+}
+
+func (s *FileTreeService) newContentFilter(contentFilters []string) map[string]bool {
+	filter := make(map[string]bool)
+	for _, item := range contentFilters {
+		filter[item] = true
+	}
+	return filter
+}
+
+func (s *FileTreeService) filterContent(path, content string, filter map[string]bool) string {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".go":
+		if filter[contentFilterGoImport] {
+			content = goImportBlockRegexp.ReplaceAllString(content, "")
+			content = goImportLineRegexp.ReplaceAllString(content, "")
+		}
+		if filter[contentFilterGoFunctionBody] {
+			content = goFunctionBodyRegexp.ReplaceAllString(content, "$1 {}")
+		}
+	case ".js", ".mjs", ".cjs":
+		if filter[contentFilterJsFunctionBody] {
+			content = jsFunctionBodyRegexp.ReplaceAllString(content, "$1{}")
+			content = jsArrowFunctionBodyRegexp.ReplaceAllString(content, "$1{}")
+		}
+	case ".vue":
+		if filter[contentFilterVueStyle] {
+			content = vueStyleRegexp.ReplaceAllString(content, "")
+		}
+	}
+	return content
 }
 
 func (s *FileTreeService) newIgnoreFilter(ignoreDirs, ignoreFiles, ignoreExts []string) *IgnoreFilter {

@@ -16,6 +16,7 @@ const newItems = reactive({
 })
 
 const fileTreeRequest = computed(() => appStore.appState.fileTreeRequest)
+const contentFilters = computed(() => fileTreeRequest.value?.contentFilters ?? [])
 
 const addItem = (key) => {
   const value = newItems[key].trim()
@@ -70,6 +71,21 @@ watch(
 
       <p v-if="!fileTreeRequest[group.key]?.length" class="empty">暂无配置</p>
     </div>
+
+    <div class="group">
+      <div class="group-header">
+        <span>内容过滤</span>
+      </div>
+
+      <div v-for="item in contentFilters" :key="item.value" class="filter-row">
+        <label class="enable">
+          <input v-model="item.enabled" type="checkbox" />
+          {{ item.label || item.value }}
+        </label>
+      </div>
+
+      <p v-if="!contentFilters.length" class="empty">暂无配置</p>
+    </div>
   </section>
 </template>
 
@@ -93,7 +109,8 @@ watch(
 }
 
 .add-row,
-.item-row {
+.item-row,
+.filter-row {
   display: flex;
   gap: 8px;
   align-items: center;

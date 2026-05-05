@@ -21,6 +21,13 @@ export const useAppStore = defineStore('app', () => {
             { value: ".svg", enabled: true },
             { value: ".ico", enabled: true },
         ],
+        contentFilters: [
+            { value: "goFunctionBody", label: "Go 函数体", enabled: false },
+            { value: "goImport", label: "Go import", enabled: false },
+            { value: "jsFunctionBody", label: "JS 函数体", enabled: false },
+            { value: "vueStyle", label: "Vue style", enabled: false },
+            { value: "otherFileReserved", label: "其他文件类型（预留）", enabled: false },
+        ],
     })
 
     const normalizeIgnoreItems = (items = []) => items
@@ -30,10 +37,23 @@ export const useAppStore = defineStore('app', () => {
             }
             return {
                 value: item?.value ?? '',
+                label: item?.label,
                 enabled: item?.enabled !== false,
             }
         })
         .filter((item) => item.value)
+
+    const normalizeContentFilters = (items = []) => {
+        const fallback = createFileTreeRequestFallback().contentFilters
+        const storedItems = normalizeIgnoreItems(items)
+        const storedMap = new Map(storedItems.map(item => [item.value, item]))
+        return fallback.map((item) => {
+            const storedItem = storedMap.get(item.value)
+            return storedItem
+                ? { ...item, enabled: storedItem.enabled }
+                : item
+        })
+    }
 
     const normalizeFileTreeRequest = (request = {}) => {
         const fallback = createFileTreeRequestFallback()
@@ -42,6 +62,7 @@ export const useAppStore = defineStore('app', () => {
             ignoreDirs: normalizeIgnoreItems(request.ignoreDirs ?? fallback.ignoreDirs),
             ignoreFiles: normalizeIgnoreItems(request.ignoreFiles ?? fallback.ignoreFiles),
             ignoreExts: normalizeIgnoreItems(request.ignoreExts ?? fallback.ignoreExts),
+            contentFilters: normalizeContentFilters(request.contentFilters ?? fallback.contentFilters),
         }
     }
 
@@ -107,7 +128,7 @@ export const useAppStore = defineStore('app', () => {
     //用于提取fileTreeRequest中选中true的项作为请求参数请求后端
     const getSelectedIgnoreConfig = () => {
         // 解构当前文件树配置
-        const { rootPath, ignoreDirs, ignoreFiles, ignoreExts } = appState.fileTreeRequest;
+        const { rootPath, ignoreDirs, ignoreFiles, ignoreExts, contentFilters } = appState.fileTreeRequest;
 
         // 通用过滤函数：只保留 enabled=true 的项，提取 value
         const filterEnabledItems = (itemList) => {
@@ -121,7 +142,8 @@ export const useAppStore = defineStore('app', () => {
             rootPath: rootPath,
             ignoreDirs: filterEnabledItems(ignoreDirs),
             ignoreFiles: filterEnabledItems(ignoreFiles),
-            ignoreExts: filterEnabledItems(ignoreExts)
+            ignoreExts: filterEnabledItems(ignoreExts),
+            contentFilters: filterEnabledItems(contentFilters),
         };
     };
 

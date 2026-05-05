@@ -35,7 +35,7 @@ func (h *FileTreeApi) GetFileContent(c *gin.Context) {
 		return
 	}
 
-	content, err := fileTreeService.GetFileContent(req.RootPath, req.IgnoreDirs, req.IgnoreFiles, req.IgnoreExts, req.SelectedPaths)
+	content, err := fileTreeService.GetFileContent(req.RootPath, req.IgnoreDirs, req.IgnoreFiles, req.IgnoreExts, req.SelectedPaths, req.ContentFilters)
 	if err != nil {
 		response.Result(500, nil, "读取文件内容失败: "+err.Error(), c)
 		return
